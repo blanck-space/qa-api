@@ -31,7 +31,6 @@ function getQuestions(req, res, next){
 }
 
 function create(req, res, next){
-  console.log(req.body)
 	let question = new Question(req.body);
   question.answers = question.answers.sort(Question.sortAnswers)
   question.save(function(err, question){

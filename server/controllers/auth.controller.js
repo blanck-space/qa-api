@@ -1,50 +1,80 @@
-import jwt from 'jsonwebtoken';
-import httpStatus from 'http-status';
-import APIError from '../helpers/APIError';
-import config from '../../config/config';
-
-// sample user, used for authentication
-const user = {
-  username: 'react',
-  password: 'express'
-};
+import User from '../models/user.model';
 
 /**
- * Returns jwt token if valid username and password is provided
- * @param req
- * @param res
- * @param next
- * @returns {*}
+ * Load user and append to req.
  */
-function login(req, res, next) {
-  // Ideally you'll fetch this from the db
-  // Idea here was to show how jwt works with simplicity
-  if (req.body.username === user.username && req.body.password === user.password) {
-    const token = jwt.sign({
-      username: user.username
-    }, config.jwtSecret);
-    return res.json({
-      token,
-      username: user.username
-    });
-  }
-
-  const err = new APIError('Authentication error', httpStatus.UNAUTHORIZED, true);
-  return next(err);
+function load(req, res, next, id) {
+  User.get(id)
+    .then((user) => {
+      req.user = user; // eslint-disable-line no-param-reassign
+      return next();
+    })
+    .catch(e => next(e));
 }
 
 /**
- * This is a protected route. Will return random number only if jwt token is provided in header.
- * @param req
- * @param res
- * @returns {*}
+ * Get user
+ * @returns {User}
  */
-function getRandomNumber(req, res) {
-  // req.user is assigned by jwt middleware if valid token is provided
-  return res.json({
-    user: req.user,
-    num: Math.random() * 100
+function get(req, res) {
+  return res.json(req.user);
+}
+
+/**
+ * Create new user
+ * @property {string} req.body.username - The username of user.
+ * @property {string} req.body.mobileNumber - The mobileNumber of user.
+ * @returns {User}
+ */
+function create(req, res, next) {
+  const user = new User({
+    username: req.body.username,
+    mobileNumber: req.body.mobileNumber
   });
+
+  user.save()
+    .then(savedUser => res.json(savedUser))
+    .catch(e => next(e));
 }
 
-export default { login, getRandomNumber };
+/**
+ * Update existing user
+ * @property {string} req.body.username - The username of user.
+ * @property {string} req.body.mobileNumber - The mobileNumber of user.
+ * @returns {User}
+ */
+function update(req, res, next) {
+  const user = req.user;
+  user.username = req.body.username;
+  user.mobileNumber = req.body.mobileNumber;
+
+  user.save()
+    .then(savedUser => res.json(savedUser))
+    .catch(e => next(e));
+}
+
+/**
+ * Get user list.
+ * @property {number} req.query.skip - Number of users to be skipped.
+ * @property {number} req.query.limit - Limit number of users to be returned.
+ * @returns {User[]}
+ */
+function list(req, res, next) {
+  const { limit = 50, skip = 0 } = req.query;
+  User.list({ limit, skip })
+    .then(users => res.json(users))
+    .catch(e => next(e));
+}
+
+/**
+ * Delete user.
+ * @returns {User}
+ */
+function remove(req, res, next) {
+  const user = req.user;
+  user.remove()
+    .then(deletedUser => res.json(deletedUser))
+    .catch(e => next(e));
+}
+
+export default { load, get, create, update, list, remove };
